@@ -1,6 +1,6 @@
-# Crypt-Rust: Architecture & Specification Document
+# rust-on-rails: Architecture & Specification Document
 
-**Project Codename:** `Crypt-Rust`  
+**Project Codename:** `rust-on-rails`  
 **Base Upstream:** `rust-lang/rust`  
 **Classification:** Confidential Systems Compiler & Adversarial Runtime  
 **Core Syntax Marker:** `$` (Unified Confidentiality & Target Modifier)
@@ -13,13 +13,13 @@
 
 Current confidential computing frameworks rely on fragmented libraries, manual zeroization calls, and heavy foreign-function interface (FFI) plumbing. 
 
-**Crypt-Rust** elevates data privacy and isolation into first-class language mechanics. By utilizing the `$` sigil as an explicit syntactic qualifier for types, literals, data structures, functions, and target domains, Crypt-Rust enables developers to write code that survives in hostile environments under a **Zero-Trust Host Model**—where the underlying operating system, supervisor layers, and memory buses are treated as untrusted or actively compromised.
+**rust-on-rails** elevates data privacy and isolation into first-class language mechanics. By utilizing the `$` sigil as an explicit syntactic qualifier for types, literals, data structures, functions, and target domains, rust-on-rails enables developers to write code that survives in hostile environments under a **Zero-Trust Host Model**—where the underlying operating system, supervisor layers, and memory buses are treated as untrusted or actively compromised.
 
 ---
 
 ## 2. Syntax & The `$` Unified Qualifier System
 
-In standard Rust, `$` is reserved strictly for macro transcription. Crypt-Rust reclaims `$` in normal code contexts, utilizing it as the universal compiler directive for privacy constraints, target isolation, and memory lifecycles.
+In standard Rust, `$` is reserved strictly for macro transcription. rust-on-rails reclaims `$` in normal code contexts, utilizing it as the universal compiler directive for privacy constraints, target isolation, and memory lifecycles.
 
 ### 2.1 Types, Literals, and Qualifiers
 
@@ -71,7 +71,7 @@ fn$defended sign_transaction(payload: &[u8]) -> [u8; 64]$crypt {
 
 ## 3. Execution Targets & Threat Models
 
-Crypt-Rust provides three primary execution targets, selectable per item via the `$` qualifier or globally across compilation crates:
+rust-on-rails provides three primary execution targets, selectable per item via the `$` qualifier or globally across compilation crates:
 
 | Target Directives | Threat Model | Isolation Mechanism | Trade-Off |
 | :--- | :--- | :--- | :--- |
@@ -85,7 +85,7 @@ Crypt-Rust provides three primary execution targets, selectable per item via the
 
 When running in an environment without hardware enclaves or bare-metal access (such as a client desktop running Windows or Linux), the programmer can activate **User-Space Software Defense**. 
 
-Because this incurs substantial CPU and memory overhead, Crypt-Rust gives the developer full control over when and how these defenses are deployed.
+Because this incurs substantial CPU and memory overhead, rust-on-rails gives the developer full control over when and how these defenses are deployed.
 
 ### Example 1: In-Memory Additive Masking with PIN Entry
 
@@ -198,7 +198,7 @@ Level: "paranoid"
 
 ## 6. Compiler Pipeline Architecture
 
-Crypt-Rust integrates changes across the AST parser, type checker, MIR optimization passes, and code generation backends:
+rust-on-rails integrates changes across the AST parser, type checker, MIR optimization passes, and code generation backends:
 
 ```text
 Source (.rs)
@@ -241,6 +241,65 @@ Source (.rs)
    * Build target profiles automating Intel SGX SDK / AMD SEV runtime harness compilation.
    * Add bare-metal targeting scripts to package pure-Rust entry points into bootable micro-VM images.
 
+### 7.1 Native Rust and rust-on-rails Source Compatibility
+
+The same source project must be able to build with both the upstream/native Rust
+compiler and the rust-on-rails compiler. This is a core compatibility requirement,
+not an optional convenience. Code that does not use rust-on-rails-only security
+semantics should remain ordinary, portable Rust.
+
+Use Rust's existing conditional-compilation model (`cfg`, `cfg_attr`, and Cargo
+features) as the compatibility mechanism rather than inventing a C-preprocessor
+style `#ifdef` syntax. The rust-on-rails compiler should expose a documented
+configuration predicate and/or target feature, for example:
+
+```rust
+#[cfg_attr(rust_on_rails, rust_on_rails::defended)]
+fn process_request(input: &[u8]) -> Result<(), Error> {
+    // One source file remains valid for native rustc and rust-on-rails.
+    handle_request(input)
+}
+```
+
+For syntax that cannot be represented as a valid native Rust attribute, provide a
+stable compatibility macro, feature-gated module, or equivalent Rust-native
+escape hatch so native `rustc` can exclude the rust-on-rails implementation at
+parse time. The compiler must document the predicate, feature names, expansion
+behavior, diagnostics, and behavior when the enhanced compiler is unavailable.
+Compatibility tests must compile representative crates in both modes and verify
+that native builds do not accidentally depend on rust-on-rails-only APIs.
+
+### 7.2 Complete Rust and Cargo Interoperability
+
+rust-on-rails must interoperate completely with Rust and the Cargo ecosystem. The
+goal is not merely source-level similarity: supported Rust code and all Cargo
+packages must be usable without requiring package authors to maintain a separate
+ecosystem or forked dependency graph.
+
+This requirement includes, subject to the target's explicitly documented limits:
+
+* compatibility with Rust's language semantics, standard library, ABI, metadata,
+  and stable compiler diagnostics;
+* building, linking, testing, documenting, and publishing ordinary Cargo
+  packages, workspaces, examples, benchmarks, build scripts, proc-macro crates,
+  and mixed dependency graphs;
+* support for crates.io packages, git/path dependencies, feature resolution,
+  profiles, build scripts, native libraries, generated code, and transitive
+  dependencies;
+* compatible Cargo lockfiles, target selection, cross-compilation, incremental
+  builds, and reproducible artifact/report generation; and
+* explicit handling of `unsafe`, FFI, inline assembly, platform-specific code,
+  and unsupported target assumptions, with clear diagnostics rather than silent
+  semantic changes.
+
+Security-enhanced behavior may require an opt-in feature or target profile, but it
+must not silently alter the meaning of ordinary Rust packages. Every divergence
+from upstream Rust or Cargo must be versioned, documented, tested against a
+reference toolchain, and classified as supported, degraded, or unsupported. A
+release cannot claim Rust/Cargo interoperability until a compatibility suite has
+built and exercised representative real-world packages, including packages with
+proc macros, native dependencies, workspace members, and feature combinations.
+
 ---
 
 ## 8. Extended Security Architecture and Implementation Contract
@@ -281,7 +340,7 @@ Introduce these phases incrementally behind an experimental feature gate. Compil
 
 ### 9.1 Problem and Semantics
 
-Useful secret computations eventually release something: an authentication decision, a signature, or authorized decrypted content. An implicit conversion from secret to public hides this decision. Crypt-Rust should require a named disclosure policy and an authority value at each release point.
+Useful secret computations eventually release something: an authentication decision, a signature, or authorized decrypted content. An implicit conversion from secret to public hides this decision. rust-on-rails should require a named disclosure policy and an authority value at each release point.
 
 The policy describes the permitted output, audience, purpose, and maximum release frequency where relevant. A reason string is audit metadata, not authorization. Creating authority requires application configuration or a trusted entry point; any function must not be able to mint unrestricted authority.
 
@@ -406,7 +465,7 @@ A secret allocation has one owner or an explicit shared ownership protocol. The 
 
 Prefer moving an owning handle over copying payload bytes. When a physical move is necessary, initialize the destination successfully before scrubbing the source. Do not wipe aliases still used by the destination. Partial initialization, partial moves, and custom destructors need field-level cleanup state. Cleanup must not precede a destructor that legitimately reads the secret.
 
-An ordinary Rust `Drop` implementation is insufficient as the sole guarantee: destructors may be skipped, including through forgetting values or aborting a process ([Rust Reference: destructors](https://doc.rust-lang.org/reference/destructors.html)). Crypt-Rust must define stronger restrictions for strict managed-secret scopes and clearly delimit cases where cleanup remains best effort.
+An ordinary Rust `Drop` implementation is insufficient as the sole guarantee: destructors may be skipped, including through forgetting values or aborting a process ([Rust Reference: destructors](https://doc.rust-lang.org/reference/destructors.html)). rust-on-rails must define stronger restrictions for strict managed-secret scopes and clearly delimit cases where cleanup remains best effort.
 
 ### 12.2 Non-Elidable Wiping
 
@@ -525,7 +584,7 @@ Test replayed challenges, a substituted channel key, unapproved measurements, de
 
 ### 15.1 Report Contents
 
-Produce both a human-readable report and versioned JSON for automated checks. Proposed invocation: `crypt-rustc --emit-security-report=report.json`. Include:
+Produce both a human-readable report and versioned JSON for automated checks. Proposed invocation: `rust-on-railsc --emit-security-report=report.json`. Include:
 
 - Compiler, runtime, backend, policy, target, and dependency versions; optimization and LTO settings.
 - Hashes of the final executable and packaged protected artifact, plus the applicable measurement derivation.
@@ -698,4 +757,4 @@ Produce final-artifact reports, signed manifests where needed, adversarial regre
 
 ### Reference Basis
 
-The external references above establish platform and language limitations. The Crypt-Rust syntax, analyses, runtime interfaces, protocols, and delivery milestones are proposed designs. Before implementation, pin the upstream Rust revision and backend versions, then write design notes against their actual internal APIs. A fork-wide security claim requires validation of the selected implementation, not merely consistency with this specification.
+The external references above establish platform and language limitations. The rust-on-rails syntax, analyses, runtime interfaces, protocols, and delivery milestones are proposed designs. Before implementation, pin the upstream Rust revision and backend versions, then write design notes against their actual internal APIs. A fork-wide security claim requires validation of the selected implementation, not merely consistency with this specification.
